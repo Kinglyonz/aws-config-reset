@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AWS Config Reset (Pre-NIST Cleanup) — CloudShell Compatible
+AWS Config Reset (Pre-NIST Cleanup) — CloudShell Compatible (Python 3.9+)
 
 Deletes AWS Config artifacts in a safe, region-aware sequence.
 
@@ -18,8 +18,7 @@ Key behavior
 - Include/Exclude glob filters for names
 - Retries/backoff on transient errors
 
-CloudShell note:
-- Removed newer API probe (list_conformance_pack_statuses) for compatibility.
+CloudShell Compatible: Fixed Python 3.9+ syntax issues
 """
 
 import argparse
@@ -28,6 +27,7 @@ import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional, List  # Python 3.9 compatible
 
 import boto3
 import botocore
@@ -40,7 +40,7 @@ THREADS = 8
 # ----------------------
 # Helpers
 # ----------------------
-def bclient(service: str, region: str, profile: str | None = None):
+def bclient(service: str, region: str, profile: Optional[str] = None):
     """Boto3 client bound to a region (and optional profile)."""
     if profile:
         session = boto3.Session(profile_name=profile, region_name=region)
@@ -49,7 +49,7 @@ def bclient(service: str, region: str, profile: str | None = None):
     return session.client(service)
 
 
-def list_regions(profile: str | None = None) -> list[str]:
+def list_regions(profile: Optional[str] = None) -> List[str]:
     """Return enabled EC2 regions for this account (sorted)."""
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
     ec2 = session.client("ec2")
@@ -57,7 +57,7 @@ def list_regions(profile: str | None = None) -> list[str]:
     return sorted(regions)
 
 
-def matches(name: str, include_patterns: list[str], exclude_patterns: list[str]) -> bool:
+def matches(name: str, include_patterns: List[str], exclude_patterns: List[str]) -> bool:
     """Glob include/exclude matching for names."""
     if include_patterns:
         if not any(fnmatch.fnmatch(name, p) for p in include_patterns):
@@ -112,7 +112,7 @@ def delete_delivery_channels(cfg, dry_run: bool, report: dict):
                 report["errors"].append({"item": f"delivery_channel:{name}", "error": str(e)})
 
 
-def list_conformance_packs(cfg) -> list[str]:
+def list_conformance_packs(cfg) -> List[str]:
     names, token = [], None
     while True:
         kwargs = {"NextToken": token} if token else {}
@@ -124,7 +124,7 @@ def list_conformance_packs(cfg) -> list[str]:
     return names
 
 
-def delete_conformance_packs(cfg, dry_run: bool, report: dict, include: list[str], exclude: list[str]):
+def delete_conformance_packs(cfg, dry_run: bool, report: dict, include: List[str], exclude: List[str]):
     for name in list_conformance_packs(cfg):
         if not matches(name, include, exclude):
             continue
@@ -136,7 +136,7 @@ def delete_conformance_packs(cfg, dry_run: bool, report: dict, include: list[str
                 report["errors"].append({"item": f"conformance_pack:{name}", "error": str(e)})
 
 
-def list_config_rules(cfg) -> list[str]:
+def list_config_rules(cfg) -> List[str]:
     names, token = [], None
     while True:
         kwargs = {"NextToken": token} if token else {}
@@ -148,7 +148,7 @@ def list_config_rules(cfg) -> list[str]:
     return names
 
 
-def delete_config_rules(cfg, dry_run: bool, report: dict, include: list[str], exclude: list[str]):
+def delete_config_rules(cfg, dry_run: bool, report: dict, include: List[str], exclude: List[str]):
     for name in list_config_rules(cfg):
         if not matches(name, include, exclude):
             continue
@@ -160,7 +160,7 @@ def delete_config_rules(cfg, dry_run: bool, report: dict, include: list[str], ex
                 report["errors"].append({"item": f"rule:{name}", "error": str(e)})
 
 
-def list_remediation_configs(cfg) -> list[str]:
+def list_remediation_configs(cfg) -> List[str]:
     names, token = [], None
     while True:
         kwargs = {"NextToken": token} if token else {}
@@ -176,7 +176,7 @@ def list_remediation_configs(cfg) -> list[str]:
     return sorted(set(names))
 
 
-def delete_remediation_configs(cfg, dry_run: bool, report: dict, include: list[str], exclude: list[str]):
+def delete_remediation_configs(cfg, dry_run: bool, report: dict, include: List[str], exclude: List[str]):
     for name in list_remediation_configs(cfg):
         if not matches(name, include, exclude):
             continue
@@ -188,7 +188,7 @@ def delete_remediation_configs(cfg, dry_run: bool, report: dict, include: list[s
                 report["errors"].append({"item": f"remediation:{name}", "error": str(e)})
 
 
-def list_aggregators(cfg) -> list[str]:
+def list_aggregators(cfg) -> List[str]:
     names, token = [], None
     while True:
         kwargs = {"NextToken": token} if token else {}
@@ -213,7 +213,7 @@ def delete_aggregators(cfg, dry_run: bool, report: dict):
 # ----------------------
 # Region workflow
 # ----------------------
-def region_reset(region: str, profile: str | None, args) -> dict:
+def region_reset(region: str, profile: Optional[str], args) -> dict:
     cfg = bclient("config", region, profile)
     report = {
         "region": region,
