@@ -1,6 +1,6 @@
 # 🚀 AWS Config Cleanup Service - Professional Solution
 
-**Professional AWS Config rule cleanup for NIST preparation and compliance readiness.**
+**Professional AWS Config rule cleanup for NIST 800-171 preparation and compliance readiness.**
 
 Transform hours of manual work into 15 minutes of automated precision.
 
@@ -30,7 +30,19 @@ Transform hours of manual work into 15 minutes of automated precision.
 
 ---
 
-## 🛠️ **Complete Toolkit**
+## ⚡ **Quick Demo (5 Minutes)**
+
+Run this single command in AWS CloudShell:
+
+```bash
+curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/scripts/demo.sh | bash
+```
+
+**Result:** Complete professional analysis with client-ready reports in under 5 minutes.
+
+---
+
+## 🛠️ **Complete Professional Toolkit**
 
 ### **Core Tools:**
 - **`aws_config_reset.py`** - Discovery & cleanup engine
@@ -46,67 +58,28 @@ Transform hours of manual work into 15 minutes of automated precision.
 
 ---
 
-## ⚡ **Quick Demo (5 Minutes)**
-
-```bash
-# Download complete toolkit
-curl -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/aws_config_reset.py
-curl -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/count_rules.py  
-curl -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/read_config_report.py
-curl -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/create_client_report.py
-
-# Run complete analysis
-python3 aws_config_reset.py --all-regions
-python3 count_rules.py
-python3 read_config_report.py
-
-# Check professional deliverables
-ls -la *.txt *.json
-```
-
-**Result:** Complete professional analysis with client-ready reports in under 5 minutes.
-
----
-
 ## 🏢 **For Enterprise Clients**
 
 ### **Discovery Phase:**
 ```bash
 # Safe discovery analysis (no changes made)
+curl -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/aws_config_reset.py
 python3 aws_config_reset.py --all-regions
-python3 count_rules.py
 ```
 
 ### **Professional Reporting:**
 ```bash
 # Generate executive-ready documentation
-python3 read_config_report.py
-python3 create_client_report.py
+curl -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/count_rules.py
+curl -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/read_config_report.py
+python3 count_rules.py && python3 read_config_report.py
 ```
 
 ### **Service Execution:**
 ```bash
-# Execute cleanup (billable service)
+# Execute cleanup (professional service)
 python3 aws_config_reset.py --all-regions --no-dry-run
 ```
-
----
-
-## 🎯 **Service Packages**
-
-### **Discovery Analysis - $500**
-- Multi-region Config rule discovery
-- Business value calculation
-- Executive summary report
-- Technical documentation
-- **Perfect for:** Initial assessment and planning
-
-### **Complete Cleanup - $3/rule**
-- Everything in Discovery Analysis
-- Automated Config rule cleanup
-- Post-cleanup verification
-- Professional service documentation
-- **Perfect for:** Full service delivery
 
 ---
 
@@ -150,22 +123,23 @@ python3 aws_config_reset.py --all-regions --no-dry-run
 
 ## 🚀 **Getting Started**
 
-1. **Schedule Discovery:** Contact us for initial assessment
-2. **Run Analysis:** We execute safe discovery across your regions  
-3. **Review Results:** Receive professional reports with ROI analysis
-4. **Execute Cleanup:** Schedule automated cleanup service
-5. **NIST Ready:** Deploy NIST 800-171 baseline on clean environment
+1. **Try the Demo:** Run our 5-minute demonstration
+2. **Review Results:** See your potential savings and scope
+3. **Schedule Service:** Contact us for professional cleanup execution
+4. **NIST Ready:** Deploy NIST 800-171 baseline on clean environment
+
+📖 **Detailed Instructions:** [docs/getting-started.md](docs/getting-started.md)  
+💰 **Pricing Details:** [docs/pricing.md](docs/pricing.md)
 
 ---
 
 ## 📞 **Professional Service**
 
-This repository provides the complete toolkit for AWS Config cleanup services.
+**Ready for professional AWS Config cleanup?**
 
-**For service inquiries:**
-- 📧 Email: [Your Business Email]
-- 📞 Phone: [Your Business Phone]  
-- 🌐 Web: [Your Business Website]
+📧 **Email:** khalillyons@gmail.com  
+📞 **Phone:** (703) 795-4193  
+💰 **Pricing:** $3 per Config rule ($500 min, $2,500 max)
 
 **Service Area:** All AWS regions globally  
 **Availability:** 24/7 automated service delivery  
@@ -173,16 +147,50 @@ This repository provides the complete toolkit for AWS Config cleanup services.
 
 ---
 
+## 🎯 **Service Packages**
+
+### **Discovery Analysis - $500**
+- Multi-region Config rule discovery
+- Business value calculation
+- Executive summary report
+- Technical documentation
+- **Perfect for:** Initial assessment and planning
+
+### **Complete Cleanup Service - $3/rule**
+- Everything in Discovery Analysis
+- Automated Config rule cleanup
+- Post-cleanup verification
+- Professional service documentation
+- **Perfect for:** Full service delivery
+
+### **Premium NIST Package - Contact for Quote**
+- Complete cleanup service
+- NIST 800-171 conformance pack deployment
+- Compliance documentation
+- Ongoing monitoring setup
+
+---
+
 ## ⚖️ **License & Usage**
 
-This toolkit is designed for professional AWS service providers. 
+This toolkit is designed for professional AWS service providers and enterprise clients.
 
-**Commercial Use:** Authorized for service provider use  
+**Commercial Use:** Authorized for professional service delivery  
 **Support:** Professional implementation support available  
-**Updates:** Regular updates for AWS API changes
+**Updates:** Regular updates for AWS API compatibility
 
 ---
 
 **Professional. Automated. Reliable.**
 
 *Transform AWS Config cleanup from hours of manual work into minutes of automated precision.*
+
+---
+
+### 🌟 **Repository Stats**
+
+![Python](https://img.shields.io/badge/python-v3.7+-blue.svg)
+![AWS](https://img.shields.io/badge/AWS-Config-orange.svg)
+![License](https://img.shields.io/badge/license-Commercial-green.svg)
+
+**Star this repository** if it helps with your AWS compliance needs!
