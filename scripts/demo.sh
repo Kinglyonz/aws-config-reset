@@ -52,7 +52,7 @@ if [ $? -eq 0 ]; then
     echo "   • Immediate NIST 800-171 readiness"
     echo ""
     echo "📞 Ready to schedule your cleanup service?"
-    echo "   Contact: [Your Business Contact Information]"
+    echo "   Contact: [7037954193]"
     echo ""
     echo "💰 Pricing: \$3 per Config rule (\$500 min, \$2,500 max)"
     echo "   Average enterprise savings: \$2,000-\$4,000"
@@ -64,7 +64,7 @@ else
     echo "   • Network connectivity"
     echo ""
     echo "📞 Contact us for personalized demonstration:"
-    echo "   [Your Business Contact Information]"
+    echo "   [Email Khalillyons@gmail.com]"
 fi
 
 echo ""
