@@ -1,6 +1,6 @@
 # 🚀 AWS Config Cleanup Service - Professional Solution
 
-**Professional AWS Config rule cleanup for NIST 800-171 preparation and compliance readiness.**
+**Professional AWS Config rule cleanup for NIST preparation and compliance readiness.**
 
 Transform hours of manual work into 15 minutes of automated precision.
 
