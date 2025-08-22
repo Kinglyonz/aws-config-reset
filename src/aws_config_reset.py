@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """
-AWS Config Reset (Enhanced Version) - CloudShell Compatible - ENHANCED OUTPUT VERSION
+AWS Config Reset - Clean Technical Version
 
-Professional AWS Config cleanup with intelligent Security Hub preservation
-and enhanced visual output formatting.
-
+Professional AWS Config cleanup with intelligent Security Hub preservation.
 Deletes AWS Config artifacts in a safe, region-aware sequence.
-ENHANCED: Uses correct boto3 API calls that actually exist!
-ENHANCED: Professional visual output with business value calculations
-ENHANCED: Security Hub rule detection and preservation messaging
 """
 
 import argparse
@@ -27,72 +22,51 @@ DEFAULT_MAX_RETRIES = 5
 DEFAULT_BACKOFF_SEC = 3
 THREADS = 8
 
-# Enhanced output formatting
 class OutputFormatter:
-    """Professional output formatting with emojis and visual elements"""
+    """Clean technical output formatting"""
     
     @staticmethod
     def print_header(title: str):
-        """Print a professional header with borders"""
-        border = "=" * 80
-        print(f"\n{border}")
-        print(f"🚀 {title}")
-        print(f"{border}")
+        """Print a clean header"""
+        print(f"\n{'='*60}")
+        print(f" {title}")
+        print(f"{'='*60}")
     
     @staticmethod
     def print_section(title: str):
         """Print a section header"""
-        print(f"\n📋 {title}")
-        print("-" * 60)
+        print(f"\n[{title}]")
+        print("-" * 40)
     
     @staticmethod
     def print_success(message: str):
-        """Print success message with green checkmark"""
-        print(f"✅ {message}")
+        """Print success message"""
+        print(f"✓ {message}")
     
     @staticmethod
     def print_warning(message: str):
-        """Print warning message with yellow warning sign"""
-        print(f"⚠️  {message}")
+        """Print warning message"""
+        print(f"! {message}")
     
     @staticmethod
     def print_error(message: str):
-        """Print error message with red X"""
-        print(f"❌ {message}")
+        """Print error message"""
+        print(f"✗ {message}")
     
     @staticmethod
     def print_info(message: str):
-        """Print info message with blue info icon"""
-        print(f"ℹ️  {message}")
+        """Print info message"""
+        print(f"• {message}")
     
     @staticmethod
-    def print_security_hub_preservation(count: int):
-        """Print Security Hub preservation message"""
-        if count > 0:
-            print(f"🛡️  SECURITY ANALYSIS: {count} SecurityHub rules found and will be PRESERVED")
-            print(f"   These rules are critical for your security monitoring and cannot be safely deleted")
-        else:
-            print(f"🛡️  SECURITY ANALYSIS: No SecurityHub rules detected")
-    
-    @staticmethod
-    def print_business_value(total_rules: int, security_hub_rules: int):
-        """Print business value calculation"""
-        cleanable_rules = total_rules - security_hub_rules
-        manual_cost = cleanable_rules * 8  # $8 per rule manual cleanup
-        service_cost = 1500  # Our service cost
-        savings = manual_cost - service_cost if manual_cost > service_cost else 0
-        
-        print(f"\n💰 BUSINESS OPPORTUNITY ANALYSIS:")
-        print(f"   🎯 Total Config rules found: {total_rules}")
-        print(f"   🛡️  Security Hub rules (preserved): {security_hub_rules}")
-        print(f"   🧹 Rules available for cleanup: {cleanable_rules}")
-        print(f"   💵 Manual cleanup cost estimate: ${manual_cost:,}")
-        print(f"   ⚡ Our intelligent service cost: ${service_cost:,}")
-        if savings > 0:
-            savings_percent = (savings / manual_cost) * 100
-            print(f"   💎 Your potential savings: ${savings:,} ({savings_percent:.0f}% reduction)")
-        else:
-            print(f"   💡 Recommended for accounts with 200+ rules for maximum value")
+    def print_security_analysis(total_rules: int, security_hub_rules: int):
+        """Print clean security analysis"""
+        print(f"\nSecurity Analysis:")
+        print(f"  Total Config rules found: {total_rules}")
+        print(f"  Security Hub managed rules: {security_hub_rules}")
+        print(f"  Rules available for cleanup: {total_rules - security_hub_rules}")
+        if security_hub_rules > 0:
+            print(f"  → Security Hub rules will be preserved")
 
 # Helper functions
 def bc_client(service: str, region: str, profile: Optional[str] = None):
@@ -124,6 +98,7 @@ def retry_call(fn, *args, **kwargs):
     """Retry AWS API calls on common throttling/in-use errors."""
     max_retries = kwargs.pop("max_retries", DEFAULT_MAX_RETRIES)
     backoff = kwargs.pop("backoff", DEFAULT_BACKOFF_SEC)
+    
     for attempt in range(1, max_retries + 1):
         try:
             return fn(*args, **kwargs)
@@ -138,7 +113,6 @@ def retry_call(fn, *args, **kwargs):
         except Exception as e:
             raise
 
-# Enhanced AWS Config operations with Security Hub detection
 def list_config_rules(cfg) -> List[str]:
     """List all Config rules with Security Hub detection."""
     names, token = [], None
@@ -150,108 +124,230 @@ def list_config_rules(cfg) -> List[str]:
             kwargs = {"NextToken": token} if token else {}
             resp = cfg.describe_config_rules(**kwargs)
             for rule in resp.get("ConfigRules", []):
-                rule_name = rule.get("ConfigRuleName", "")
-                if rule_name:
-                    # Detect Security Hub managed rules
-                    if rule_name.startswith("securityhub-"):
-                        security_hub_rules.append(rule_name)
-                    else:
-                        regular_rules.append(rule_name)
-                    names.append(rule_name)
+                rule_name = rule["ConfigRuleName"]
+                names.append(rule_name)
+                
+                # Detect Security Hub managed rules
+                if (rule.get("Source", {}).get("Owner") == "AWS" and 
+                    "SecurityHub" in rule_name):
+                    security_hub_rules.append(rule_name)
+                else:
+                    regular_rules.append(rule_name)
+            
             token = resp.get("NextToken")
             if not token:
                 break
+                
     except Exception as e:
         OutputFormatter.print_warning(f"Could not list config rules: {e}")
         return []
     
-    # Display Security Hub analysis
-    if security_hub_rules:
-        OutputFormatter.print_security_hub_preservation(len(security_hub_rules))
-        OutputFormatter.print_info(f"Security Hub rules detected: {', '.join(security_hub_rules[:3])}{'...' if len(security_hub_rules) > 3 else ''}")
+    # Display analysis
+    if names:
+        OutputFormatter.print_security_analysis(len(names), len(security_hub_rules))
+        if security_hub_rules:
+            print(f"  Security Hub rules: {', '.join(security_hub_rules[:3])}{'...' if len(security_hub_rules) > 3 else ''}")
     
     return names
 
-def delete_config_rules(cfg, dry_run: bool, report: dict, include: List[str], exclude: List[str]):
-    """Delete Config rules with Security Hub protection."""
-    security_hub_preserved = 0
-    deleted_count = 0
+def delete_config_rules(cfg, rule_names: List[str], include_patterns: List[str], exclude_patterns: List[str], dry_run: bool = False):
+    """Delete Config rules (excluding Security Hub rules)."""
+    if not rule_names:
+        return []
     
-    for name in list_config_rules(cfg):
-        # Protect Security Hub rules
-        if name.startswith("securityhub-"):
-            security_hub_preserved += 1
-            report["notes"].append(f"PRESERVED Security Hub rule: {name} (critical for security monitoring)")
+    # Filter out Security Hub rules for safety
+    safe_rules = []
+    preserved_rules = []
+    
+    for rule_name in rule_names:
+        if "SecurityHub" in rule_name:
+            preserved_rules.append(rule_name)
             continue
-            
-        if not matches(name, include, exclude):
-            continue
-            
-        report["rules"].append({"name": name, "action": "delete"})
-        if not dry_run:
-            try:
-                retry_call(cfg.delete_config_rule, ConfigRuleName=name)
-                deleted_count += 1
-                OutputFormatter.print_success(f"Deleted rule: {name}")
-            except botocore.exceptions.ClientError as e:
-                error_msg = f"Failed to delete rule {name}: {str(e)}"
-                report["errors"].append({"item": f"rule:{name}", "error": error_msg})
-                OutputFormatter.print_error(error_msg)
-            except Exception as e:
-                error_msg = f"Unexpected error deleting rule {name}: {str(e)}"
-                report["errors"].append({"item": f"rule:{name}", "error": error_msg})
-                OutputFormatter.print_error(error_msg)
+        
+        if matches(rule_name, include_patterns, exclude_patterns):
+            safe_rules.append(rule_name)
     
-    if security_hub_preserved > 0:
-        OutputFormatter.print_success(f"Protected {security_hub_preserved} Security Hub rules from deletion")
+    if preserved_rules:
+        OutputFormatter.print_info(f"Preserving {len(preserved_rules)} Security Hub rules")
     
-    return deleted_count, security_hub_preserved
+    if not safe_rules:
+        OutputFormatter.print_info("No rules to delete after filtering")
+        return []
+    
+    OutputFormatter.print_info(f"Processing {len(safe_rules)} rules for cleanup")
+    
+    if dry_run:
+        OutputFormatter.print_info("DRY RUN - Would delete:")
+        for rule in safe_rules[:10]:  # Show first 10
+            print(f"  - {rule}")
+        if len(safe_rules) > 10:
+            print(f"  ... and {len(safe_rules) - 10} more")
+        return safe_rules
+    
+    deleted = []
+    for rule_name in safe_rules:
+        try:
+            retry_call(cfg.delete_config_rule, ConfigRuleName=rule_name)
+            deleted.append(rule_name)
+            OutputFormatter.print_success(f"Deleted rule: {rule_name}")
+        except Exception as e:
+            OutputFormatter.print_error(f"Failed to delete {rule_name}: {e}")
+    
+    return deleted
 
-# Enhanced region processing
+def delete_remediation_configurations(cfg, dry_run: bool = False):
+    """Delete remediation configurations."""
+    try:
+        resp = cfg.describe_remediation_configurations()
+        configs = resp.get("RemediationConfigurations", [])
+        
+        if not configs:
+            return []
+        
+        OutputFormatter.print_info(f"Found {len(configs)} remediation configurations")
+        
+        if dry_run:
+            OutputFormatter.print_info("DRY RUN - Would delete remediation configurations")
+            return [c["ConfigRuleName"] for c in configs]
+        
+        deleted = []
+        for config in configs:
+            rule_name = config["ConfigRuleName"]
+            try:
+                retry_call(cfg.delete_remediation_configuration, ConfigRuleName=rule_name)
+                deleted.append(rule_name)
+                OutputFormatter.print_success(f"Deleted remediation: {rule_name}")
+            except Exception as e:
+                OutputFormatter.print_error(f"Failed to delete remediation {rule_name}: {e}")
+        
+        return deleted
+    except Exception as e:
+        OutputFormatter.print_warning(f"Could not process remediation configurations: {e}")
+        return []
+
+def delete_conformance_packs(cfg, dry_run: bool = False):
+    """Delete conformance packs."""
+    try:
+        resp = cfg.describe_conformance_packs()
+        packs = resp.get("ConformancePackDetails", [])
+        
+        if not packs:
+            return []
+        
+        OutputFormatter.print_info(f"Found {len(packs)} conformance packs")
+        
+        if dry_run:
+            OutputFormatter.print_info("DRY RUN - Would delete conformance packs")
+            return [p["ConformancePackName"] for p in packs]
+        
+        deleted = []
+        for pack in packs:
+            pack_name = pack["ConformancePackName"]
+            try:
+                retry_call(cfg.delete_conformance_pack, ConformancePackName=pack_name)
+                deleted.append(pack_name)
+                OutputFormatter.print_success(f"Deleted conformance pack: {pack_name}")
+            except Exception as e:
+                OutputFormatter.print_error(f"Failed to delete pack {pack_name}: {e}")
+        
+        return deleted
+    except Exception as e:
+        OutputFormatter.print_warning(f"Could not process conformance packs: {e}")
+        return []
+
+def delete_config_recorders_and_channels(cfg, dry_run: bool = False):
+    """Delete configuration recorders and delivery channels."""
+    deleted_items = []
+    
+    try:
+        # Delete recorders
+        resp = cfg.describe_configuration_recorders()
+        recorders = resp.get("ConfigurationRecorders", [])
+        
+        for recorder in recorders:
+            name = recorder["name"]
+            if dry_run:
+                OutputFormatter.print_info(f"DRY RUN - Would delete recorder: {name}")
+                deleted_items.append(f"recorder:{name}")
+            else:
+                try:
+                    retry_call(cfg.delete_configuration_recorder, ConfigurationRecorderName=name)
+                    deleted_items.append(f"recorder:{name}")
+                    OutputFormatter.print_success(f"Deleted recorder: {name}")
+                except Exception as e:
+                    OutputFormatter.print_error(f"Failed to delete recorder {name}: {e}")
+        
+        # Delete delivery channels
+        resp = cfg.describe_delivery_channels()
+        channels = resp.get("DeliveryChannels", [])
+        
+        for channel in channels:
+            name = channel["name"]
+            if dry_run:
+                OutputFormatter.print_info(f"DRY RUN - Would delete delivery channel: {name}")
+                deleted_items.append(f"channel:{name}")
+            else:
+                try:
+                    retry_call(cfg.delete_delivery_channel, DeliveryChannelName=name)
+                    deleted_items.append(f"channel:{name}")
+                    OutputFormatter.print_success(f"Deleted delivery channel: {name}")
+                except Exception as e:
+                    OutputFormatter.print_error(f"Failed to delete channel {name}: {e}")
+        
+    except Exception as e:
+        OutputFormatter.print_warning(f"Could not process recorders/channels: {e}")
+    
+    return deleted_items
+
 def region_reset(region: str, profile: Optional[str], args) -> dict:
-    """Enhanced region processing with professional output."""
+    """Reset AWS Config in a single region."""
+    OutputFormatter.print_section(f"Processing Region: {region}")
+    
     cfg = bc_client("config", region, profile)
     report = {
         "region": region,
-        "recorders": [],
-        "delivery_channels": [],
-        "conformance_packs": [],
-        "remediations": [],
+        "timestamp": time.time(),
         "rules": [],
-        "aggregators": [],
-        "errors": [],
-        "notes": [
-            "Intelligent cleanup preserves Security Hub rules for continued security monitoring"
-        ]
+        "remediations": [],
+        "conformance_packs": [],
+        "recorders_channels": [],
+        "notes": []
     }
     
-    OutputFormatter.print_section(f"Processing Region: {region}")
-    
-    # Get initial rule count for business analysis
-    all_rules = list_config_rules(cfg)
-    security_hub_count = len([r for r in all_rules if r.startswith("securityhub-")])
-    
-    # Display business value analysis
-    OutputFormatter.print_business_value(len(all_rules), security_hub_count)
-    
-    # Process cleanup operations
-    if args.dry_run:
-        OutputFormatter.print_info("DRY RUN MODE - No changes will be made")
-    else:
-        OutputFormatter.print_info("LIVE MODE - Changes will be applied")
-    
-    # Delete rules with Security Hub protection
-    deleted_count, preserved_count = delete_config_rules(cfg, args.dry_run, report, args.include, args.exclude)
-    
-    if not args.dry_run and deleted_count > 0:
-        OutputFormatter.print_success(f"Successfully cleaned up {deleted_count} rules in {region}")
+    try:
+        # List and process rules
+        rule_names = list_config_rules(cfg)
+        if rule_names:
+            deleted_rules = delete_config_rules(cfg, rule_names, args.include, args.exclude, args.dry_run)
+            report["rules"] = deleted_rules
+        
+        # Process other Config resources
+        deleted_remediations = delete_remediation_configurations(cfg, args.dry_run)
+        report["remediations"] = deleted_remediations
+        
+        deleted_packs = delete_conformance_packs(cfg, args.dry_run)
+        report["conformance_packs"] = deleted_packs
+        
+        deleted_infra = delete_config_recorders_and_channels(cfg, args.dry_run)
+        report["recorders_channels"] = deleted_infra
+        
+        # Summary for region
+        total_items = len(deleted_rules) + len(deleted_remediations) + len(deleted_packs) + len(deleted_infra)
+        if total_items > 0:
+            OutputFormatter.print_success(f"Region {region}: {total_items} items processed")
+        else:
+            OutputFormatter.print_info(f"Region {region}: No items to process")
+        
+    except Exception as e:
+        OutputFormatter.print_error(f"Error processing region {region}: {e}")
+        report["notes"].append(f"Error: {str(e)}")
     
     return report
 
 def main():
-    """Enhanced main function with professional output."""
+    """Main function with clean technical output."""
     parser = argparse.ArgumentParser(
-        description="AWS Config Reset - Enhanced Professional Version with Security Hub Protection"
+        description="AWS Config Reset - Clean Technical Version"
     )
     parser.add_argument("--profile", help="AWS profile name")
     parser.add_argument("--region", help="Single region to process")
@@ -262,23 +358,24 @@ def main():
     
     args = parser.parse_args()
     
-    # Professional header
-    OutputFormatter.print_header("AWS Config Professional Cleanup Service")
-    OutputFormatter.print_info("Intelligent cleanup with Security Hub preservation")
+    # Clean header
+    OutputFormatter.print_header("AWS Config Cleanup Tool")
+    if args.dry_run:
+        OutputFormatter.print_info("Running in DRY RUN mode - no changes will be made")
     
     if args.all_regions:
         regions = list_regions(args.profile)
-        OutputFormatter.print_info(f"Processing {len(regions)} regions: {', '.join(regions)}")
+        OutputFormatter.print_info(f"Processing {len(regions)} regions")
     elif args.region:
         regions = [args.region]
-        OutputFormatter.print_info(f"Processing single region: {args.region}")
+        OutputFormatter.print_info(f"Processing region: {args.region}")
     else:
         OutputFormatter.print_error("Must specify either --region or --all-regions")
         sys.exit(1)
     
     # Process regions
     all_reports = []
-    total_rules_found = 0
+    total_rules_processed = 0
     total_security_hub_preserved = 0
     
     for region in regions:
@@ -287,29 +384,23 @@ def main():
             all_reports.append(report)
             
             # Aggregate statistics
-            region_rules = len(report["rules"])
-            region_notes = [n for n in report["notes"] if "Security Hub" in n]
-            total_rules_found += region_rules
-            total_security_hub_preserved += len(region_notes)
+            total_rules_processed += len(report["rules"])
             
         except Exception as e:
             OutputFormatter.print_error(f"Failed to process region {region}: {e}")
     
     # Final summary
-    OutputFormatter.print_header("CLEANUP SUMMARY")
-    OutputFormatter.print_success(f"Processed {len(regions)} regions successfully")
-    OutputFormatter.print_info(f"Total rules processed: {total_rules_found}")
-    if total_security_hub_preserved > 0:
-        OutputFormatter.print_success(f"Security Hub rules preserved: {total_security_hub_preserved}")
+    OutputFormatter.print_header("Summary")
+    OutputFormatter.print_success(f"Processed {len(regions)} regions")
+    OutputFormatter.print_info(f"Total rules processed: {total_rules_processed}")
     
-    # Save detailed report
+    # Save report
     timestamp = int(time.time())
     report_file = f"aws_config_cleanup_report_{timestamp}.json"
     with open(report_file, "w") as f:
         json.dump(all_reports, f, indent=2)
     
-    OutputFormatter.print_success(f"Detailed report saved: {report_file}")
-    OutputFormatter.print_info("🎯 Ready for professional service delivery!")
+    OutputFormatter.print_success(f"Report saved: {report_file}")
 
 if __name__ == "__main__":
     main()
