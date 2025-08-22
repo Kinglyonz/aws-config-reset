@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """
-Human-Readable AWS Config Report Generator
+Human-Readable AWS Config Report Generator - FIXED VERSION
 Converts technical JSON into beautiful business-friendly reports
 """
+
 import json
 from datetime import datetime
 from collections import defaultdict
+
+def calculate_pricing(total_rules):
+    """Calculate pricing based on $3/rule with min $500, max $2,500"""
+    base_price = total_rules * 3
+    final_price = max(500, min(base_price, 2500))
+    return final_price
 
 def analyze_rules(rules):
     """Categorize and analyze rules by type"""
@@ -13,7 +20,6 @@ def analyze_rules(rules):
     
     for rule in rules:
         rule_name = rule['name']
-        
         if rule_name.startswith('securityhub-'):
             categories['Security Hub Rules'].append(rule_name)
         elif rule_name.endswith('-conformance-pack-rcn2awzbq'):
@@ -35,32 +41,36 @@ def analyze_rules(rules):
     
     return categories
 
-def calculate_pricing(total_rules):
-    """Calculate pricing based on $3/rule with min $500, max $2,500"""
-    base_price = total_rules * 3
-    final_price = max(500, min(base_price, 2500))
-    return final_price
-
 def create_business_summary(data):
-    """Create executive-friendly summary"""
+    """Create executive-friendly summary with FIXED division by zero handling"""
     region_data = data['regions'][0]  # Assuming single region for now
     total_rules = len(region_data['rules'])
     conformance_packs = len(region_data['conformance_packs'])
     
-    # Calculate business metrics
+    # Calculate business metrics with SAFETY CHECKS
+    service_price = calculate_pricing(total_rules)
     manual_hours = (total_rules * 2) / 60  # 2 minutes per rule
     manual_cost = manual_hours * 240  # $240/hour rate
-    our_price = calculate_pricing(total_rules)
-    client_savings = manual_cost - our_price
+    
+    # FIXED: Prevent division by zero
+    if manual_cost > 0:
+        client_savings = manual_cost - service_price
+        cost_reduction_pct = (client_savings / manual_cost) * 100
+        roi_pct = (client_savings / service_price) * 100 if service_price > 0 else 0
+    else:
+        client_savings = 0
+        cost_reduction_pct = 0
+        roi_pct = 0
     
     summary = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                    AWS CONFIG CLEANUP ANALYSIS REPORT                       ║
-║                           Easy-to-Read Summary                               ║
+║                           Easy-to-Read Summary                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 📊 DISCOVERY RESULTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ✅ Total Config Rules Found: {total_rules}
 📦 Conformance Packs Found: {conformance_packs}
 🌍 Regions Analyzed: {region_data['region']}
@@ -68,21 +78,47 @@ def create_business_summary(data):
 
 💰 BUSINESS VALUE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 🕐 Manual Cleanup Time: {manual_hours:.1f} hours
-💵 Manual Labor Cost: ${manual_cost:,.0f} at $240/hour
-⚡ Our Automated Service: 15 minutes
-💰 Our Service Price: ${our_price:,.0f} ($3 per rule)
-🎯 Your Savings: ${client_savings:,.0f} ({(client_savings/manual_cost)*100:.0f}% cost reduction)
+💵 Manual Labor Cost: ${manual_cost:,.0f} (at $240/hour)
+⚡ Our Service Price: ${service_price:,.0f}
+🎯 Your Savings: ${client_savings:,.0f} ({cost_reduction_pct:.1f}% cost reduction)
+📈 Return on Investment: {roi_pct:.0f}%
 
 🎯 WHAT THIS MEANS FOR YOUR BUSINESS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Your AWS account has significant Config rule complexity
-• Manual cleanup would require {manual_hours:.1f} hours of careful technical work
-• High risk of accidentally breaking critical security configurations
-• Our automated service eliminates this risk and saves you ${client_savings:,.0f}
-• Perfect preparation for NIST 800-171 compliance deployment
+
+- Your AWS account has significant Config rule complexity
+- Manual cleanup would require {manual_hours:.1f} hours of careful technical work
+- High risk of accidentally breaking critical security configurations
+- Our automated service eliminates this risk and saves massive time
+- Perfect preparation for NIST 800-171 compliance deployment
+
+💰 SERVICE PACKAGE OPTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 Config Cleanup Service: ${service_price:,.0f}
+   • Multi-region Config rule cleanup
+   • Professional documentation
+   • Business value analysis
+   • 15-minute automated execution
+   • Zero risk guarantee
+
+🏛️ Complete NIST 800-171 Package: ${service_price + 7500:,.0f}
+   • Everything in Config Cleanup Service
+   • NIST 800-171 conformance pack deployment
+   • 100+ compliance monitoring rules
+   • Executive compliance documentation
+   • Ongoing monitoring setup
+
+📅 Ongoing Services Available:
+   • Monthly compliance monitoring: $500/month
+   • Quarterly security reviews: $1,000/quarter
+   • Annual compliance certification: $2,500/year
+   • Violation remediation: $200/hour
 
 """
+    
     return summary
 
 def create_detailed_breakdown(rules):
@@ -100,15 +136,17 @@ def create_detailed_breakdown(rules):
     
     for category, rule_list in sorted_categories:
         count = len(rule_list)
-        percentage = (count / len(rules)) * 100
-        category_value = count * 3  # $3 per rule value
-        
+        if len(rules) > 0:  # FIXED: Prevent division by zero
+            percentage = (count / len(rules)) * 100
+        else:
+            percentage = 0
+            
         breakdown += f"""
 🔹 {category.upper()}
-   Total Rules: {count} ({percentage:.1f}% of all rules)
-   Category Value: ${category_value} cleanup value
-   
-   Sample Rules:
+Total Rules: {count} ({percentage:.1f}% of all rules)
+Cleanup Value: ${count * 3} cleanup value
+
+Sample Rules:
 """
         
         # Show first 3 rules as examples
@@ -116,10 +154,10 @@ def create_detailed_breakdown(rules):
             # Clean up rule name for display
             clean_name = rule.replace('securityhub-', '').replace('-conformance-pack-rcn2awzbq', '')
             clean_name = clean_name.replace('-', ' ').title()
-            breakdown += f"   • {clean_name}\n"
+            breakdown += f"  • {clean_name}\n"
         
         if len(rule_list) > 3:
-            breakdown += f"   • ... and {len(rule_list) - 3} more similar rules\n"
+            breakdown += f"  • ... and {len(rule_list) - 3} more similar rules\n"
         
         breakdown += "\n"
     
@@ -128,19 +166,15 @@ def create_detailed_breakdown(rules):
 def create_next_steps_guide(data):
     """Create actionable next steps"""
     is_dry_run = data['dry_run']
-    total_rules = len(data['regions'][0]['rules'])
-    our_price = calculate_pricing(total_rules)
-    manual_cost = ((total_rules * 2) / 60) * 240
-    savings = manual_cost - our_price
     
     if is_dry_run:
-        guide = f"""
+        guide = """
 🚀 RECOMMENDED NEXT STEPS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📋 PHASE 1: REVIEW & APPROVE (This Analysis)
 ✅ You are here - Safe discovery analysis completed
-✅ No changes made to your AWS environment
+✅ No changes made to your AWS environment  
 ✅ Full understanding of cleanup scope established
 
 🧹 PHASE 2: EXECUTE CLEANUP (Recommended)
@@ -155,33 +189,22 @@ def create_next_steps_guide(data):
 🔒 Enterprise-grade security configuration
 📈 Ongoing compliance monitoring setup
 
-💰 YOUR PRICING BREAKDOWN:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Rules Found: {total_rules}
-💵 Price per Rule: $3
-🧮 Base Calculation: {total_rules} × $3 = ${total_rules * 3:,}
-🎯 Your Final Price: ${our_price:,} {"(minimum $500 applied)" if our_price == 500 else "(capped at $2,500)" if our_price == 2500 else ""}
-💰 Manual Cost: ${manual_cost:,.0f}
-🎉 Your Savings: ${savings:,.0f}
-
-📋 ADDITIONAL SERVICES AVAILABLE:
-• NIST 800-171 Deployment: $2,000
-• Monthly Compliance Monitoring: $500/month
-• Quarterly Security Reviews: $1,000/quarter
-
 💬 READY TO PROCEED?
-Contact us to schedule your cleanup service.
-Guaranteed savings: ${savings:,.0f} vs manual cleanup approach.
+Contact us to schedule Phase 2 cleanup execution.
+
+📧 Email: khalillyons@gmail.com
+📞 Phone: (703) 795-4193
+💰 Investment: As calculated above
+
 """
     else:
-        guide = f"""
+        guide = """
 ✅ CLEANUP COMPLETED SUCCESSFULLY!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🎉 Your AWS Config cleanup has been completed successfully!
-🧹 All {total_rules} Config rules have been safely removed
+🧹 All identified rules have been safely removed
 🎯 Your account is now ready for NIST 800-171 deployment
-💰 Total savings achieved: ${savings:,.0f}
 
 🚀 RECOMMENDED NEXT STEPS
 📋 Deploy NIST 800-171 conformance pack
@@ -190,49 +213,53 @@ Guaranteed savings: ${savings:,.0f} vs manual cleanup approach.
 📅 Schedule quarterly compliance reviews
 
 💼 ADDITIONAL SERVICES AVAILABLE
-🏛️ NIST 800-171 deployment and configuration ($2,000)
-📈 Ongoing compliance monitoring ($500/month)
-🔍 Quarterly security posture reviews ($1,000/quarter)
-📊 Executive compliance reporting ($300/month)
+🏛️ NIST 800-171 deployment and configuration
+📈 Ongoing compliance monitoring
+🔍 Monthly security posture reviews
+📊 Executive compliance reporting
 
-Contact us for ongoing compliance and monitoring services.
+Contact us for Phase 3 services and ongoing support.
+
 """
     
     return guide
 
 def generate_human_readable_report(json_file):
     """Main function to generate human-readable report"""
-    
     # Load JSON data
     with open(json_file, 'r') as f:
         data = json.load(f)
+    
+    # Handle empty regions gracefully
+    if not data['regions'] or len(data['regions']) == 0:
+        print("❌ No regions found in report data.")
+        return
     
     # Generate all sections
     summary = create_business_summary(data)
     breakdown = create_detailed_breakdown(data['regions'][0]['rules'])
     next_steps = create_next_steps_guide(data)
     
-    total_rules = len(data['regions'][0]['rules'])
-    our_price = calculate_pricing(total_rules)
-    
     # Combine into final report
     final_report = f"""
 {summary}
+
 {breakdown}
+
 {next_steps}
 
 ═══════════════════════════════════════════════════════════════════════════════
 PROFESSIONAL AWS CONFIG CLEANUP SERVICE
+
 Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
 
-For questions or to schedule services:
-📧 Email: [Your Email]
-📞 Phone: [Your Phone]
-🌐 Web: [Your Website]
+For questions or to schedule additional services:
+📧 Email: khalillyons@gmail.com
+📞 Phone: (703) 795-4193
+🌐 Web: Professional AWS Config Cleanup Service
 
-Pricing: $3 per Config rule (Min: $500 | Max: $2,500)
-Your Price: ${our_price:,} for {total_rules} rules
 ═══════════════════════════════════════════════════════════════════════════════
+
 """
     
     # Save human-readable report
@@ -243,9 +270,17 @@ Your Price: ${our_price:,} for {total_rules} rules
     print(f"✅ Human-readable report created: {output_file}")
     print(f"📄 This report is perfect for sharing with non-technical stakeholders!")
     
-    # Also create a one-page executive summary
-    manual_cost = ((total_rules * 2) / 60) * 240
-    savings = manual_cost - our_price
+    # Also create a one-page executive summary with FIXED calculations
+    total_rules = len(data['regions'][0]['rules']) if data['regions'] else 0
+    service_price = calculate_pricing(total_rules)
+    manual_hours = (total_rules * 2) / 60
+    manual_cost = manual_hours * 240
+    
+    # FIXED: Safe calculation
+    if manual_cost > 0 and service_price > 0:
+        savings = manual_cost - service_price
+    else:
+        savings = 0
     
     exec_summary = f"""
 EXECUTIVE SUMMARY - AWS CONFIG CLEANUP ANALYSIS
@@ -253,26 +288,22 @@ EXECUTIVE SUMMARY - AWS CONFIG CLEANUP ANALYSIS
 
 🔍 DISCOVERY: {total_rules} Config rules found requiring cleanup
 
-💰 PRICING BREAKDOWN:
-• Price per rule: $3
-• Your price: ${our_price:,} for {total_rules} rules
-• Manual cleanup cost: ${manual_cost:,.0f}
-• Your savings: ${savings:,.0f} ({(savings/manual_cost)*100:.0f}% reduction)
+💰 BUSINESS IMPACT:
+  - Manual cleanup: {manual_hours:.1f} hours
+  - Labor cost: ${manual_cost:,.0f}
+  - Our service: ${service_price:,.0f}
+  - Net savings: ${savings:,.0f}
 
 🎯 RECOMMENDATION: Proceed with automated cleanup service
 
-⏱️ DELIVERY:
-• Timeline: 15 minutes automated service
-• Risk: Zero (professional automated process)
-• Result: Clean AWS environment ready for NIST 800-171
-
-📊 ROI ANALYSIS:
-• Cost savings: ${savings:,.0f}
-• Time savings: {((total_rules * 2) / 60):.1f} hours
-• Risk elimination: Priceless
+Investment: ${service_price:,.0f}
+Timeline: 15 minutes
+Risk: Zero (professional automated process)
+Result: Clean AWS environment ready for NIST 800-171
 
 Prepared by: AWS Config Cleanup Service
 Date: {datetime.now().strftime('%B %d, %Y')}
+
 """
     
     with open('Executive_Summary.txt', 'w') as f:
