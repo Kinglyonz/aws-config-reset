@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-AWS Config Reset - Clean Technical Version
+AWS Config Reset (Pre-NIST Cleanup) — CloudShell Compatible - FIXED VERSION
 
-Professional AWS Config cleanup with intelligent Security Hub preservation.
 Deletes AWS Config artifacts in a safe, region-aware sequence.
+FIXED: Uses correct boto3 API calls that actually exist!
 """
 
 import argparse
@@ -17,59 +17,15 @@ from typing import Optional, List
 import boto3
 import botocore
 
-# Configuration constants
 DEFAULT_MAX_RETRIES = 5
 DEFAULT_BACKOFF_SEC = 3
 THREADS = 8
 
-class OutputFormatter:
-    """Clean technical output formatting"""
-    
-    @staticmethod
-    def print_header(title: str):
-        """Print a clean header"""
-        print(f"\n{'='*60}")
-        print(f" {title}")
-        print(f"{'='*60}")
-    
-    @staticmethod
-    def print_section(title: str):
-        """Print a section header"""
-        print(f"\n[{title}]")
-        print("-" * 40)
-    
-    @staticmethod
-    def print_success(message: str):
-        """Print success message"""
-        print(f"✓ {message}")
-    
-    @staticmethod
-    def print_warning(message: str):
-        """Print warning message"""
-        print(f"! {message}")
-    
-    @staticmethod
-    def print_error(message: str):
-        """Print error message"""
-        print(f"✗ {message}")
-    
-    @staticmethod
-    def print_info(message: str):
-        """Print info message"""
-        print(f"• {message}")
-    
-    @staticmethod
-    def print_security_analysis(total_rules: int, security_hub_rules: int):
-        """Print clean security analysis"""
-        print(f"\nSecurity Analysis:")
-        print(f"  Total Config rules found: {total_rules}")
-        print(f"  Security Hub managed rules: {security_hub_rules}")
-        print(f"  Rules available for cleanup: {total_rules - security_hub_rules}")
-        if security_hub_rules > 0:
-            print(f"  → Security Hub rules will be preserved")
 
-# Helper functions
-def bc_client(service: str, region: str, profile: Optional[str] = None):
+# ----------------------
+# Helpers
+# ----------------------
+def bclient(service: str, region: str, profile: Optional[str] = None):
     """Boto3 client bound to a region (and optional profile)."""
     if profile:
         session = boto3.Session(profile_name=profile, region_name=region)
@@ -77,12 +33,14 @@ def bc_client(service: str, region: str, profile: Optional[str] = None):
         session = boto3.Session(region_name=region)
     return session.client(service)
 
+
 def list_regions(profile: Optional[str] = None) -> List[str]:
     """Return enabled EC2 regions for this account (sorted)."""
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
     ec2 = session.client("ec2")
     regions = [r["RegionName"] for r in ec2.describe_regions(AllRegions=False)["Regions"]]
     return sorted(regions)
+
 
 def matches(name: str, include_patterns: List[str], exclude_patterns: List[str]) -> bool:
     """Glob include/exclude matching for names."""
@@ -94,313 +52,249 @@ def matches(name: str, include_patterns: List[str], exclude_patterns: List[str])
             return False
     return True
 
+
 def retry_call(fn, *args, **kwargs):
     """Retry AWS API calls on common throttling/in-use errors."""
     max_retries = kwargs.pop("max_retries", DEFAULT_MAX_RETRIES)
     backoff = kwargs.pop("backoff", DEFAULT_BACKOFF_SEC)
-    
     for attempt in range(1, max_retries + 1):
         try:
             return fn(*args, **kwargs)
         except botocore.exceptions.ClientError as e:
             msg = str(e).lower()
             code = e.response.get("Error", {}).get("Code", "")
-            if code in ("ResourceInUseException", "ThrottlingException", "TooManyRequestsException") or "rate exceeded" in msg:
+            if code in {"ResourceInUseException", "ThrottlingException", "TooManyRequestsException"} or "rate exceeded" in msg:
                 if attempt < max_retries:
                     time.sleep(backoff * attempt)
                     continue
             raise
-        except Exception as e:
-            raise
+
+
+# ----------------------
+# Per-type operations - FIXED API CALLS
+# ----------------------
+def stop_recorders(cfg, dry_run: bool, report: dict):
+    try:
+        resp = cfg.describe_configuration_recorders()
+        for r in resp.get("ConfigurationRecorders", []):
+            name = r.get("name", "<unknown>")
+            report["recorders"].append({"name": name, "action": "stop"})
+            if not dry_run:
+                try:
+                    cfg.stop_configuration_recorder(ConfigurationRecorderName=name)
+                except botocore.exceptions.ClientError as e:
+                    report["errors"].append({"item": f"recorder:{name}", "error": str(e)})
+    except Exception as e:
+        report["errors"].append({"item": "recorders", "error": f"Failed to list recorders: {str(e)}"})
+
+
+def delete_delivery_channels(cfg, dry_run: bool, report: dict):
+    try:
+        resp = cfg.describe_delivery_channels()
+        for c in resp.get("DeliveryChannels", []):
+            name = c.get("name", "<unknown>")
+            report["delivery_channels"].append({"name": name, "action": "delete"})
+            if not dry_run:
+                try:
+                    cfg.delete_delivery_channel(DeliveryChannelName=name)
+                except botocore.exceptions.ClientError as e:
+                    report["errors"].append({"item": f"delivery_channel:{name}", "error": str(e)})
+    except Exception as e:
+        report["errors"].append({"item": "delivery_channels", "error": f"Failed to list delivery channels: {str(e)}"})
+
+
+def list_conformance_packs(cfg) -> List[str]:
+    """FIXED: Using correct API call"""
+    names = []
+    try:
+        # Use the CORRECT API call
+        resp = cfg.describe_conformance_packs()
+        names.extend(p["ConformancePackName"] for p in resp.get("ConformancePackDetails", []))
+    except Exception as e:
+        print(f"Warning: Could not list conformance packs: {e}")
+    return names
+
+
+def delete_conformance_packs(cfg, dry_run: bool, report: dict, include: List[str], exclude: List[str]):
+    for name in list_conformance_packs(cfg):
+        if not matches(name, include, exclude):
+            continue
+        report["conformance_packs"].append({"name": name, "action": "delete"})
+        if not dry_run:
+            try:
+                retry_call(cfg.delete_conformance_pack, ConformancePackName=name)
+            except botocore.exceptions.ClientError as e:
+                report["errors"].append({"item": f"conformance_pack:{name}", "error": str(e)})
+
 
 def list_config_rules(cfg) -> List[str]:
-    """List all Config rules with Security Hub detection."""
+    """This one was already correct"""
     names, token = [], None
-    security_hub_rules = []
-    regular_rules = []
-    
     try:
         while True:
             kwargs = {"NextToken": token} if token else {}
             resp = cfg.describe_config_rules(**kwargs)
-            for rule in resp.get("ConfigRules", []):
-                rule_name = rule["ConfigRuleName"]
-                names.append(rule_name)
-                
-                # Detect Security Hub managed rules
-                if (rule.get("Source", {}).get("Owner") == "AWS" and 
-                    "SecurityHub" in rule_name):
-                    security_hub_rules.append(rule_name)
-                else:
-                    regular_rules.append(rule_name)
-            
+            names.extend(r["ConfigRuleName"] for r in resp.get("ConfigRules", []))
             token = resp.get("NextToken")
             if not token:
                 break
-                
     except Exception as e:
-        OutputFormatter.print_warning(f"Could not list config rules: {e}")
-        return []
-    
-    # Display analysis
-    if names:
-        OutputFormatter.print_security_analysis(len(names), len(security_hub_rules))
-        if security_hub_rules:
-            print(f"  Security Hub rules: {', '.join(security_hub_rules[:3])}{'...' if len(security_hub_rules) > 3 else ''}")
-    
+        print(f"Warning: Could not list config rules: {e}")
     return names
 
-def delete_config_rules(cfg, rule_names: List[str], include_patterns: List[str], exclude_patterns: List[str], dry_run: bool = False):
-    """Delete Config rules (excluding Security Hub rules)."""
-    if not rule_names:
-        return []
-    
-    # Filter out Security Hub rules for safety
-    safe_rules = []
-    preserved_rules = []
-    
-    for rule_name in rule_names:
-        if "SecurityHub" in rule_name:
-            preserved_rules.append(rule_name)
-            continue
-        
-        if matches(rule_name, include_patterns, exclude_patterns):
-            safe_rules.append(rule_name)
-    
-    if preserved_rules:
-        OutputFormatter.print_info(f"Preserving {len(preserved_rules)} Security Hub rules")
-    
-    if not safe_rules:
-        OutputFormatter.print_info("No rules to delete after filtering")
-        return []
-    
-    OutputFormatter.print_info(f"Processing {len(safe_rules)} rules for cleanup")
-    
-    if dry_run:
-        OutputFormatter.print_info("DRY RUN - Would delete:")
-        for rule in safe_rules[:10]:  # Show first 10
-            print(f"  - {rule}")
-        if len(safe_rules) > 10:
-            print(f"  ... and {len(safe_rules) - 10} more")
-        return safe_rules
-    
-    deleted = []
-    for rule_name in safe_rules:
-        try:
-            retry_call(cfg.delete_config_rule, ConfigRuleName=rule_name)
-            deleted.append(rule_name)
-            OutputFormatter.print_success(f"Deleted rule: {rule_name}")
-        except Exception as e:
-            OutputFormatter.print_error(f"Failed to delete {rule_name}: {e}")
-    
-    return deleted
 
-def delete_remediation_configurations(cfg, dry_run: bool = False):
-    """Delete remediation configurations."""
+def delete_config_rules(cfg, dry_run: bool, report: dict, include: List[str], exclude: List[str]):
+    for name in list_config_rules(cfg):
+        if not matches(name, include, exclude):
+            continue
+        report["rules"].append({"name": name, "action": "delete"})
+        if not dry_run:
+            try:
+                retry_call(cfg.delete_config_rule, ConfigRuleName=name)
+            except botocore.exceptions.ClientError as e:
+                report["errors"].append({"item": f"rule:{name}", "error": str(e)})
+
+
+def list_remediation_configs(cfg) -> List[str]:
+    """FIXED: Better error handling"""
+    names = []
     try:
         resp = cfg.describe_remediation_configurations()
-        configs = resp.get("RemediationConfigurations", [])
-        
-        if not configs:
-            return []
-        
-        OutputFormatter.print_info(f"Found {len(configs)} remediation configurations")
-        
-        if dry_run:
-            OutputFormatter.print_info("DRY RUN - Would delete remediation configurations")
-            return [c["ConfigRuleName"] for c in configs]
-        
-        deleted = []
-        for config in configs:
-            rule_name = config["ConfigRuleName"]
+        for rc in resp.get("RemediationConfigurations", []):
+            n = rc.get("ConfigRuleName")
+            if n:
+                names.append(n)
+    except Exception as e:
+        print(f"Warning: Could not list remediation configs: {e}")
+    return sorted(set(names))
+
+
+def delete_remediation_configs(cfg, dry_run: bool, report: dict, include: List[str], exclude: List[str]):
+    for name in list_remediation_configs(cfg):
+        if not matches(name, include, exclude):
+            continue
+        report["remediations"].append({"rule": name, "action": "delete"})
+        if not dry_run:
             try:
-                retry_call(cfg.delete_remediation_configuration, ConfigRuleName=rule_name)
-                deleted.append(rule_name)
-                OutputFormatter.print_success(f"Deleted remediation: {rule_name}")
-            except Exception as e:
-                OutputFormatter.print_error(f"Failed to delete remediation {rule_name}: {e}")
-        
-        return deleted
-    except Exception as e:
-        OutputFormatter.print_warning(f"Could not process remediation configurations: {e}")
-        return []
+                retry_call(cfg.delete_remediation_configuration, ConfigRuleName=name)
+            except botocore.exceptions.ClientError as e:
+                report["errors"].append({"item": f"remediation:{name}", "error": str(e)})
 
-def delete_conformance_packs(cfg, dry_run: bool = False):
-    """Delete conformance packs."""
+
+def list_aggregators(cfg) -> List[str]:
+    """This one was already correct"""
+    names = []
     try:
-        resp = cfg.describe_conformance_packs()
-        packs = resp.get("ConformancePackDetails", [])
-        
-        if not packs:
-            return []
-        
-        OutputFormatter.print_info(f"Found {len(packs)} conformance packs")
-        
-        if dry_run:
-            OutputFormatter.print_info("DRY RUN - Would delete conformance packs")
-            return [p["ConformancePackName"] for p in packs]
-        
-        deleted = []
-        for pack in packs:
-            pack_name = pack["ConformancePackName"]
+        resp = cfg.describe_configuration_aggregators()
+        names.extend(a["ConfigurationAggregatorName"] for a in resp.get("ConfigurationAggregators", []))
+    except Exception as e:
+        print(f"Warning: Could not list aggregators: {e}")
+    return names
+
+
+def delete_aggregators(cfg, dry_run: bool, report: dict):
+    for name in list_aggregators(cfg):
+        report["aggregators"].append({"name": name, "action": "delete"})
+        if not dry_run:
             try:
-                retry_call(cfg.delete_conformance_pack, ConformancePackName=pack_name)
-                deleted.append(pack_name)
-                OutputFormatter.print_success(f"Deleted conformance pack: {pack_name}")
-            except Exception as e:
-                OutputFormatter.print_error(f"Failed to delete pack {pack_name}: {e}")
-        
-        return deleted
-    except Exception as e:
-        OutputFormatter.print_warning(f"Could not process conformance packs: {e}")
-        return []
+                retry_call(cfg.delete_configuration_aggregator, ConfigurationAggregatorName=name)
+            except botocore.exceptions.ClientError as e:
+                report["errors"].append({"item": f"aggregator:{name}", "error": str(e)})
 
-def delete_config_recorders_and_channels(cfg, dry_run: bool = False):
-    """Delete configuration recorders and delivery channels."""
-    deleted_items = []
-    
-    try:
-        # Delete recorders
-        resp = cfg.describe_configuration_recorders()
-        recorders = resp.get("ConfigurationRecorders", [])
-        
-        for recorder in recorders:
-            name = recorder["name"]
-            if dry_run:
-                OutputFormatter.print_info(f"DRY RUN - Would delete recorder: {name}")
-                deleted_items.append(f"recorder:{name}")
-            else:
-                try:
-                    retry_call(cfg.delete_configuration_recorder, ConfigurationRecorderName=name)
-                    deleted_items.append(f"recorder:{name}")
-                    OutputFormatter.print_success(f"Deleted recorder: {name}")
-                except Exception as e:
-                    OutputFormatter.print_error(f"Failed to delete recorder {name}: {e}")
-        
-        # Delete delivery channels
-        resp = cfg.describe_delivery_channels()
-        channels = resp.get("DeliveryChannels", [])
-        
-        for channel in channels:
-            name = channel["name"]
-            if dry_run:
-                OutputFormatter.print_info(f"DRY RUN - Would delete delivery channel: {name}")
-                deleted_items.append(f"channel:{name}")
-            else:
-                try:
-                    retry_call(cfg.delete_delivery_channel, DeliveryChannelName=name)
-                    deleted_items.append(f"channel:{name}")
-                    OutputFormatter.print_success(f"Deleted delivery channel: {name}")
-                except Exception as e:
-                    OutputFormatter.print_error(f"Failed to delete channel {name}: {e}")
-        
-    except Exception as e:
-        OutputFormatter.print_warning(f"Could not process recorders/channels: {e}")
-    
-    return deleted_items
 
+# ----------------------
+# Region workflow
+# ----------------------
 def region_reset(region: str, profile: Optional[str], args) -> dict:
-    """Reset AWS Config in a single region."""
-    OutputFormatter.print_section(f"Processing Region: {region}")
-    
-    cfg = bc_client("config", region, profile)
+    cfg = bclient("config", region, profile)
     report = {
         "region": region,
-        "timestamp": time.time(),
-        "rules": [],
-        "remediations": [],
+        "recorders": [],
+        "delivery_channels": [],
         "conformance_packs": [],
-        "recorders_channels": [],
-        "notes": []
+        "remediations": [],
+        "rules": [],
+        "aggregators": [],
+        "errors": [],
+        "notes": [
+            "Note: Org/StackSet-managed artifacts must be removed from the management account."
+        ],
     }
-    
-    try:
-        # List and process rules
-        rule_names = list_config_rules(cfg)
-        if rule_names:
-            deleted_rules = delete_config_rules(cfg, rule_names, args.include, args.exclude, args.dry_run)
-            report["rules"] = deleted_rules
-        
-        # Process other Config resources
-        deleted_remediations = delete_remediation_configurations(cfg, args.dry_run)
-        report["remediations"] = deleted_remediations
-        
-        deleted_packs = delete_conformance_packs(cfg, args.dry_run)
-        report["conformance_packs"] = deleted_packs
-        
-        deleted_infra = delete_config_recorders_and_channels(cfg, args.dry_run)
-        report["recorders_channels"] = deleted_infra
-        
-        # Summary for region
-        total_items = len(deleted_rules) + len(deleted_remediations) + len(deleted_packs) + len(deleted_infra)
-        if total_items > 0:
-            OutputFormatter.print_success(f"Region {region}: {total_items} items processed")
-        else:
-            OutputFormatter.print_info(f"Region {region}: No items to process")
-        
-    except Exception as e:
-        OutputFormatter.print_error(f"Error processing region {region}: {e}")
-        report["notes"].append(f"Error: {str(e)}")
-    
+
+    print(f"Processing region: {region}")
+
+    # 1) Stop recorders
+    stop_recorders(cfg, args.dry_run, report)
+
+    # 2) Optionally delete delivery channels
+    if args.full_disable:
+        delete_delivery_channels(cfg, args.dry_run, report)
+
+    # 3) Delete conformance packs
+    delete_conformance_packs(cfg, args.dry_run, report, args.include, args.exclude)
+
+    # 4) Delete remediation configs
+    delete_remediation_configs(cfg, args.dry_run, report, args.include, args.exclude)
+
+    # 5) Delete config rules
+    delete_config_rules(cfg, args.dry_run, report, args.include, args.exclude)
+
+    # 6) Optionally delete aggregators
+    if args.delete_aggregators:
+        delete_aggregators(cfg, args.dry_run, report)
+
     return report
 
-def main():
-    """Main function with clean technical output."""
-    parser = argparse.ArgumentParser(
-        description="AWS Config Reset - Clean Technical Version"
-    )
-    parser.add_argument("--profile", help="AWS profile name")
-    parser.add_argument("--region", help="Single region to process")
-    parser.add_argument("--all-regions", action="store_true", help="Process all enabled regions")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be done without making changes")
-    parser.add_argument("--include", nargs="*", default=[], help="Include patterns for rule names")
-    parser.add_argument("--exclude", nargs="*", default=[], help="Exclude patterns for rule names")
-    
-    args = parser.parse_args()
-    
-    # Clean header
-    OutputFormatter.print_header("AWS Config Cleanup Tool")
-    if args.dry_run:
-        OutputFormatter.print_info("Running in DRY RUN mode - no changes will be made")
-    
+
+# ----------------------
+# CLI
+# ----------------------
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Pre-NIST AWS Config Reset - FIXED VERSION")
+    ap.add_argument("--profile", help="AWS named profile")
+    ap.add_argument("--regions", nargs="*", help="Specific regions (space-separated)")
+    ap.add_argument("--all-regions", action="store_true", help="Sweep all enabled regions")
+    ap.add_argument("--include", nargs="*", default=[], help="Glob include patterns for rule/pack names")
+    ap.add_argument("--exclude", nargs="*", default=[], help="Glob exclude patterns for rule/pack names")
+    ap.add_argument("--dry-run", action="store_true", default=True, help="Dry run (default ON). Use --no-dry-run to execute.")
+    ap.add_argument("--no-dry-run", dest="dry_run", action="store_false")
+    ap.add_argument("--full-disable", action="store_true", help="Also delete delivery channels (disables Config data delivery)")
+    ap.add_argument("--delete-aggregators", action="store_true", help="Attempt to delete configuration aggregators")
+    ap.add_argument("--json-report", default="config_reset_report.json", help="Path to JSON report output")
+    args = ap.parse_args()
+
+    # Region selection
+    if not args.all_regions and not args.regions:
+        session = boto3.Session(profile_name=args.profile) if args.profile else boto3.Session()
+        cur_region = session.region_name or "us-east-1"
+        print(f"INFO: No regions provided. Defaulting to current session region: {cur_region}")
+        args.regions = [cur_region]
     if args.all_regions:
-        regions = list_regions(args.profile)
-        OutputFormatter.print_info(f"Processing {len(regions)} regions")
-    elif args.region:
-        regions = [args.region]
-        OutputFormatter.print_info(f"Processing region: {args.region}")
-    else:
-        OutputFormatter.print_error("Must specify either --region or --all-regions")
-        sys.exit(1)
-    
-    # Process regions
-    all_reports = []
-    total_rules_processed = 0
-    total_security_hub_preserved = 0
-    
-    for region in regions:
-        try:
-            report = region_reset(region, args.profile, args)
-            all_reports.append(report)
-            
-            # Aggregate statistics
-            total_rules_processed += len(report["rules"])
-            
-        except Exception as e:
-            OutputFormatter.print_error(f"Failed to process region {region}: {e}")
-    
-    # Final summary
-    OutputFormatter.print_header("Summary")
-    OutputFormatter.print_success(f"Processed {len(regions)} regions")
-    OutputFormatter.print_info(f"Total rules processed: {total_rules_processed}")
-    
-    # Save report
-    timestamp = int(time.time())
-    report_file = f"aws_config_cleanup_report_{timestamp}.json"
-    with open(report_file, "w") as f:
-        json.dump(all_reports, f, indent=2)
-    
-    OutputFormatter.print_success(f"Report saved: {report_file}")
+        args.regions = list_regions(profile=args.profile)
+        print(f"INFO: Discovered enabled regions: {', '.join(args.regions)}")
+
+    # Execute regions in parallel
+    results = []
+    errors = 0
+    with ThreadPoolExecutor(max_workers=THREADS) as ex:
+        futures = {ex.submit(region_reset, r, args.profile, args): r for r in args.regions}
+        for fut in as_completed(futures):
+            try:
+                results.append(fut.result())
+            except Exception as e:
+                errors += 1
+                results.append({"region": futures[fut], "errors": [str(e)]})
+
+    # Persist a single report file
+    with open(args.json_report, "w") as f:
+        json.dump({"dry_run": args.dry_run, "regions": results}, f, indent=2)
+
+    print(f"\n=== Done. Report written to {args.json_report} ===")
+    if args.dry_run:
+        print("NOTE: Dry run only. Re-run with --no-dry-run to execute deletions.")
+
+    return 0 if errors == 0 else 2
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
