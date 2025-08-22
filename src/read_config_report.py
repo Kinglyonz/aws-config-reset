@@ -35,6 +35,12 @@ def analyze_rules(rules):
     
     return categories
 
+def calculate_pricing(total_rules):
+    """Calculate pricing based on $3/rule with min $500, max $2,500"""
+    base_price = total_rules * 3
+    final_price = max(500, min(base_price, 2500))
+    return final_price
+
 def create_business_summary(data):
     """Create executive-friendly summary"""
     region_data = data['regions'][0]  # Assuming single region for now
@@ -43,7 +49,9 @@ def create_business_summary(data):
     
     # Calculate business metrics
     manual_hours = (total_rules * 2) / 60  # 2 minutes per rule
-    cost_savings = manual_hours * 240  # $240/hour rate (updated from $180)
+    manual_cost = manual_hours * 240  # $240/hour rate
+    our_price = calculate_pricing(total_rules)
+    client_savings = manual_cost - our_price
     
     summary = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -61,16 +69,17 @@ def create_business_summary(data):
 💰 BUSINESS VALUE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 Manual Cleanup Time: {manual_hours:.1f} hours
-💵 Labor Cost at $240/hour: ${cost_savings:,.0f}
+💵 Manual Labor Cost: ${manual_cost:,.0f} at $240/hour
 ⚡ Our Automated Service: 15 minutes
-💰 Time Savings Value: ${cost_savings - 100:,.0f}
+💰 Our Service Price: ${our_price:,.0f} ($3 per rule)
+🎯 Your Savings: ${client_savings:,.0f} ({(client_savings/manual_cost)*100:.0f}% cost reduction)
 
 🎯 WHAT THIS MEANS FOR YOUR BUSINESS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Your AWS account has significant Config rule complexity
 • Manual cleanup would require {manual_hours:.1f} hours of careful technical work
 • High risk of accidentally breaking critical security configurations
-• Our automated service eliminates this risk and saves massive time
+• Our automated service eliminates this risk and saves you ${client_savings:,.0f}
 • Perfect preparation for NIST 800-171 compliance deployment
 
 """
@@ -92,10 +101,12 @@ def create_detailed_breakdown(rules):
     for category, rule_list in sorted_categories:
         count = len(rule_list)
         percentage = (count / len(rules)) * 100
+        category_value = count * 3  # $3 per rule value
         
         breakdown += f"""
 🔹 {category.upper()}
    Total Rules: {count} ({percentage:.1f}% of all rules)
+   Category Value: ${category_value} cleanup value
    
    Sample Rules:
 """
@@ -117,9 +128,13 @@ def create_detailed_breakdown(rules):
 def create_next_steps_guide(data):
     """Create actionable next steps"""
     is_dry_run = data['dry_run']
+    total_rules = len(data['regions'][0]['rules'])
+    our_price = calculate_pricing(total_rules)
+    manual_cost = ((total_rules * 2) / 60) * 240
+    savings = manual_cost - our_price
     
     if is_dry_run:
-        guide = """
+        guide = f"""
 🚀 RECOMMENDED NEXT STEPS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -140,35 +155,33 @@ def create_next_steps_guide(data):
 🔒 Enterprise-grade security configuration
 📈 Ongoing compliance monitoring setup
 
-💰 SERVICE PACKAGE OPTIONS:
+💰 YOUR PRICING BREAKDOWN:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📦 Basic Cleanup: $1,500
-   • Single region cleanup
-   • Essential reporting
-   • Standard execution
+📊 Rules Found: {total_rules}
+💵 Price per Rule: $3
+🧮 Base Calculation: {total_rules} × $3 = ${total_rules * 3:,}
+🎯 Your Final Price: ${our_price:,} {"(minimum $500 applied)" if our_price == 500 else "(capped at $2,500)" if our_price == 2500 else ""}
+💰 Manual Cost: ${manual_cost:,.0f}
+🎉 Your Savings: ${savings:,.0f}
 
-🏢 Enterprise Cleanup: $3,500  
-   • Multi-region cleanup
-   • Professional categorized reporting
-   • Executive documentation
-
-👑 Premium Package: $5,500
-   • Everything in Enterprise
-   • NIST 800-171 consultation
-   • Deployment planning session
+📋 ADDITIONAL SERVICES AVAILABLE:
+• NIST 800-171 Deployment: $2,000
+• Monthly Compliance Monitoring: $500/month
+• Quarterly Security Reviews: $1,000/quarter
 
 💬 READY TO PROCEED?
 Contact us to schedule your cleanup service.
-ROI: Save $2,000-5,000+ vs manual cleanup costs.
+Guaranteed savings: ${savings:,.0f} vs manual cleanup approach.
 """
     else:
-        guide = """
+        guide = f"""
 ✅ CLEANUP COMPLETED SUCCESSFULLY!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🎉 Your AWS Config cleanup has been completed successfully!
-🧹 All identified rules have been safely removed
+🧹 All {total_rules} Config rules have been safely removed
 🎯 Your account is now ready for NIST 800-171 deployment
+💰 Total savings achieved: ${savings:,.0f}
 
 🚀 RECOMMENDED NEXT STEPS
 📋 Deploy NIST 800-171 conformance pack
@@ -179,7 +192,7 @@ ROI: Save $2,000-5,000+ vs manual cleanup costs.
 💼 ADDITIONAL SERVICES AVAILABLE
 🏛️ NIST 800-171 deployment and configuration ($2,000)
 📈 Ongoing compliance monitoring ($500/month)
-🔍 Monthly security posture reviews ($1,000/month)
+🔍 Quarterly security posture reviews ($1,000/quarter)
 📊 Executive compliance reporting ($300/month)
 
 Contact us for ongoing compliance and monitoring services.
@@ -199,6 +212,9 @@ def generate_human_readable_report(json_file):
     breakdown = create_detailed_breakdown(data['regions'][0]['rules'])
     next_steps = create_next_steps_guide(data)
     
+    total_rules = len(data['regions'][0]['rules'])
+    our_price = calculate_pricing(total_rules)
+    
     # Combine into final report
     final_report = f"""
 {summary}
@@ -214,7 +230,8 @@ For questions or to schedule services:
 📞 Phone: [Your Phone]
 🌐 Web: [Your Website]
 
-Service Packages: $1,500 (Basic) | $3,500 (Enterprise) | $5,500 (Premium)
+Pricing: $3 per Config rule (Min: $500 | Max: $2,500)
+Your Price: ${our_price:,} for {total_rules} rules
 ═══════════════════════════════════════════════════════════════════════════════
 """
     
@@ -227,28 +244,32 @@ Service Packages: $1,500 (Basic) | $3,500 (Enterprise) | $5,500 (Premium)
     print(f"📄 This report is perfect for sharing with non-technical stakeholders!")
     
     # Also create a one-page executive summary
+    manual_cost = ((total_rules * 2) / 60) * 240
+    savings = manual_cost - our_price
+    
     exec_summary = f"""
 EXECUTIVE SUMMARY - AWS CONFIG CLEANUP ANALYSIS
 ═══════════════════════════════════════════════
 
-🔍 DISCOVERY: {len(data['regions'][0]['rules'])} Config rules found requiring cleanup
+🔍 DISCOVERY: {total_rules} Config rules found requiring cleanup
 
-💰 BUSINESS IMPACT:
-• Manual cleanup: {((len(data['regions'][0]['rules']) * 2) / 60):.1f} hours
-• Labor cost: ${((len(data['regions'][0]['rules']) * 2) / 60) * 240:,.0f}
-• Our service: 15 minutes
-• Net savings: ${(((len(data['regions'][0]['rules']) * 2) / 60) * 240) - 100:,.0f}
+💰 PRICING BREAKDOWN:
+• Price per rule: $3
+• Your price: ${our_price:,} for {total_rules} rules
+• Manual cleanup cost: ${manual_cost:,.0f}
+• Your savings: ${savings:,.0f} ({(savings/manual_cost)*100:.0f}% reduction)
 
 🎯 RECOMMENDATION: Proceed with automated cleanup service
 
-💰 INVESTMENT OPTIONS:
-• Basic Cleanup: $1,500 (single region)
-• Enterprise Cleanup: $3,500 (multi-region + professional reports)  
-• Premium Package: $5,500 (everything + NIST consultation)
+⏱️ DELIVERY:
+• Timeline: 15 minutes automated service
+• Risk: Zero (professional automated process)
+• Result: Clean AWS environment ready for NIST 800-171
 
-Timeline: 15 minutes
-Risk: Zero (professional automated process)
-Result: Clean AWS environment ready for NIST 800-171
+📊 ROI ANALYSIS:
+• Cost savings: ${savings:,.0f}
+• Time savings: {((total_rules * 2) / 60):.1f} hours
+• Risk elimination: Priceless
 
 Prepared by: AWS Config Cleanup Service
 Date: {datetime.now().strftime('%B %d, %Y')}
