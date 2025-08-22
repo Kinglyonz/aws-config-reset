@@ -43,7 +43,7 @@ def create_business_summary(data):
     
     # Calculate business metrics
     manual_hours = (total_rules * 2) / 60  # 2 minutes per rule
-    cost_savings = manual_hours * 180  # $180/hour rate
+    cost_savings = manual_hours * 240  # $240/hour rate (updated from $180)
     
     summary = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -61,9 +61,9 @@ def create_business_summary(data):
 💰 BUSINESS VALUE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 Manual Cleanup Time: {manual_hours:.1f} hours
-💵 Labor Cost at $180/hour: ${cost_savings:,.0f}
+💵 Labor Cost at $240/hour: ${cost_savings:,.0f}
 ⚡ Our Automated Service: 15 minutes
-💰 Time Savings Value: ${cost_savings - 75:,.0f}
+💰 Time Savings Value: ${cost_savings - 100:,.0f}
 
 🎯 WHAT THIS MEANS FOR YOUR BUSINESS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -140,9 +140,26 @@ def create_next_steps_guide(data):
 🔒 Enterprise-grade security configuration
 📈 Ongoing compliance monitoring setup
 
+💰 SERVICE PACKAGE OPTIONS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 Basic Cleanup: $1,500
+   • Single region cleanup
+   • Essential reporting
+   • Standard execution
+
+🏢 Enterprise Cleanup: $3,500  
+   • Multi-region cleanup
+   • Professional categorized reporting
+   • Executive documentation
+
+👑 Premium Package: $5,500
+   • Everything in Enterprise
+   • NIST 800-171 consultation
+   • Deployment planning session
+
 💬 READY TO PROCEED?
-Contact us to schedule Phase 2 cleanup execution.
-Investment: $3,500 for complete multi-region service.
+Contact us to schedule your cleanup service.
+ROI: Save $2,000-5,000+ vs manual cleanup costs.
 """
     else:
         guide = """
@@ -160,12 +177,12 @@ Investment: $3,500 for complete multi-region service.
 📅 Schedule quarterly compliance reviews
 
 💼 ADDITIONAL SERVICES AVAILABLE
-🏛️ NIST 800-171 deployment and configuration
-📈 Ongoing compliance monitoring
-🔍 Monthly security posture reviews
-📊 Executive compliance reporting
+🏛️ NIST 800-171 deployment and configuration ($2,000)
+📈 Ongoing compliance monitoring ($500/month)
+🔍 Monthly security posture reviews ($1,000/month)
+📊 Executive compliance reporting ($300/month)
 
-Contact us for Phase 3 services and ongoing support.
+Contact us for ongoing compliance and monitoring services.
 """
     
     return guide
@@ -192,10 +209,12 @@ def generate_human_readable_report(json_file):
 PROFESSIONAL AWS CONFIG CLEANUP SERVICE
 Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
 
-For questions or to schedule additional services:
+For questions or to schedule services:
 📧 Email: [Your Email]
 📞 Phone: [Your Phone]
 🌐 Web: [Your Website]
+
+Service Packages: $1,500 (Basic) | $3,500 (Enterprise) | $5,500 (Premium)
 ═══════════════════════════════════════════════════════════════════════════════
 """
     
@@ -216,13 +235,17 @@ EXECUTIVE SUMMARY - AWS CONFIG CLEANUP ANALYSIS
 
 💰 BUSINESS IMPACT:
 • Manual cleanup: {((len(data['regions'][0]['rules']) * 2) / 60):.1f} hours
-• Labor cost: ${((len(data['regions'][0]['rules']) * 2) / 60) * 180:,.0f}
+• Labor cost: ${((len(data['regions'][0]['rules']) * 2) / 60) * 240:,.0f}
 • Our service: 15 minutes
-• Net savings: ${(((len(data['regions'][0]['rules']) * 2) / 60) * 180) - 75:,.0f}
+• Net savings: ${(((len(data['regions'][0]['rules']) * 2) / 60) * 240) - 100:,.0f}
 
 🎯 RECOMMENDATION: Proceed with automated cleanup service
 
-Investment: $3,500
+💰 INVESTMENT OPTIONS:
+• Basic Cleanup: $1,500 (single region)
+• Enterprise Cleanup: $3,500 (multi-region + professional reports)  
+• Premium Package: $5,500 (everything + NIST consultation)
+
 Timeline: 15 minutes
 Risk: Zero (professional automated process)
 Result: Clean AWS environment ready for NIST 800-171
