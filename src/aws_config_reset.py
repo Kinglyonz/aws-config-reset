@@ -160,19 +160,30 @@ def delete_remediation_configs(cfg, dry_run: bool, report: dict):
         if not rule_names:
             return
         
-        # Check for remediation configs for these rules
-        resp = cfg.describe_remediation_configurations(ConfigRuleNames=rule_names)
-        for config in resp.get("RemediationConfigurations", []):
-            name = config.get("ConfigRuleName", "<unknown>")
-            report["remediation_configs"].append({"name": name, "action": "delete"})
-            if not dry_run:
-                try:
-                    cfg.delete_remediation_configuration(ConfigRuleName=name)
-                except botocore.exceptions.ClientError as e:
-                    report["errors"].append({"item": f"remediation:{name}", "error": str(e)})
+        # FIXED: Batch the API calls (AWS limit is 25 rules per call)
+        batch_size = 25
+        for i in range(0, len(rule_names), batch_size):
+            batch = rule_names[i:i + batch_size]
+            
+            try:
+                # Check for remediation configs for this batch of rules
+                resp = cfg.describe_remediation_configurations(ConfigRuleNames=batch)
+                for config in resp.get("RemediationConfigurations", []):
+                    name = config.get("ConfigRuleName", "<unknown>")
+                    report["remediation_configs"].append({"name": name, "action": "delete"})
+                    if not dry_run:
+                        try:
+                            cfg.delete_remediation_configuration(ConfigRuleName=name)
+                        except botocore.exceptions.ClientError as e:
+                            report["errors"].append({"item": f"remediation:{name}", "error": str(e)})
+            except botocore.exceptions.ClientError as e:
+                # Skip batches that fail - this is common when no remediation configs exist
+                continue
+                
     except Exception as e:
-        # Suppress harmless warnings - this is expected when no rules exist
-        pass
+        # Only suppress if this is the expected "no rules" case
+        if "not rule_names" not in str(e):
+            report["errors"].append({"item": "remediation_configs", "error": str(e)})
 
 # ----------------------
 # Main region processor
